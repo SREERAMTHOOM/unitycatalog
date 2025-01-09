@@ -1,6 +1,7 @@
 
 {pkgs}: {
   deps = [
+    pkgs.zeromq
     pkgs.glibcLocales
     pkgs.rustc
     pkgs.libiconv
