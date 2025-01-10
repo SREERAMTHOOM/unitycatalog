@@ -24,21 +24,39 @@ class BedrockSession:
         self.agent_alias_id = agent_alias_id
         self.client = boto3.client('bedrock-agent-runtime')
 
-    def invoke_agent(self, input_text: str):
+    def invoke_agent(
+        self,
+        input_text: str,
+        session_id: Optional[str] = None,
+        enable_trace: Optional[bool] = None,
+        response_stream: Optional[bool] = None
+    ):
         """
         Invoke the Bedrock agent with the given input text.
 
         Args:
             input_text: The text input to send to the agent
+            session_id: Optional session identifier for maintaining conversation context
+            enable_trace: Optional flag to enable step-by-step agent execution trace
+            response_stream: Optional flag to stream the response
 
         Returns:
             The agent's response
         """
-        return self.client.invoke_agent(
-            agentId=self.agent_id,
-            agentAliasId=self.agent_alias_id,
-            inputText=input_text
-        )
+        params = {
+            "agentId": self.agent_id,
+            "agentAliasId": self.agent_alias_id,
+            "inputText": input_text,
+        }
+        
+        if session_id:
+            params["sessionId"] = session_id
+        if enable_trace is not None:
+            params["enableTrace"] = enable_trace
+        if response_stream is not None:
+            params["responseStream"] = response_stream
+            
+        return self.client.invoke_agent(**params)
 
 class BedrockTool(BaseModel):
     """Model representing a Unity Catalog function as a Bedrock tool."""
