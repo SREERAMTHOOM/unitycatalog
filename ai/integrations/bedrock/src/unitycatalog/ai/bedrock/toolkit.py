@@ -29,7 +29,8 @@ class BedrockSession:
         input_text: str,
         session_id: Optional[str] = None,
         enable_trace: Optional[bool] = None,
-        response_stream: Optional[bool] = None
+        response_stream: Optional[bool] = None,
+        end_session: Optional[bool] = None
     ):
         """
         Invoke the Bedrock agent with the given input text.
@@ -39,6 +40,7 @@ class BedrockSession:
             session_id: Optional session identifier for maintaining conversation context
             enable_trace: Optional flag to enable step-by-step agent execution trace
             response_stream: Optional flag to stream the response
+            end_session: Optional flag to end the current session after this invocation
 
         Returns:
             The agent's response
@@ -55,6 +57,8 @@ class BedrockSession:
             params["enableTrace"] = enable_trace
         if response_stream is not None:
             params["responseStream"] = response_stream
+        if end_session is not None:
+            params["endSession"] = end_session
             
         return self.client.invoke_agent(**params)
 
