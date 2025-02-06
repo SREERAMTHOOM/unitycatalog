@@ -55,6 +55,7 @@ class BedrockToolResponse(BaseModel):
                 if chunk:
                     yield chunk
 
+# TODO Move to bedrock utils.
 def extract_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Extracts tool calls from Bedrock response."""
     tool_calls = []
@@ -73,20 +74,23 @@ def extract_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
                         },
                         'invocation_id': control_data['invocationId']
                     })
+                    #TODO: - Invocation ID is common for all functions
     return tool_calls
 
-def execute_tool_calls(tool_calls, client):
+def execute_tool_calls(tool_calls, client, catalog_name, schema_name):
     results = []
     for tool_call in tool_calls:
         try:
             full_function_name = tool_call.get("function_name")
             print(f"Attempting to execute function: {full_function_name} with parameters: {tool_call.get('parameters')}")
             
+            # Derive the three level namespace from toolkit session 
+            function_name = full_function_name.split('__')[1]
+            full_function_name_override = f'{catalog_name}.{schema_name}.{function_name}'
             # Attempt to retrieve function info explicitly and log it
-            full_function_name_override = 'AICatalog.AISchema.location_weather_in_c'
             function_info = client.get_function(full_function_name_override)
             print(f"Retrieved function info Override: {function_info}")
-            
+            # We are checking the existence of the function and assuming it's safe to call with parameters given by LLM
             result = client.execute_function(
                 full_function_name_override,
                 tool_call['parameters']
@@ -109,7 +113,7 @@ def generate_tool_call_session_state(tool_result: Dict[str, Any],
     action_group, function = tool_call['function_name'].split('__')
     return {
         'invocationId': tool_result['invocation_id'],
-        'returnControlInvocationResults': [{
+        'returnControlInvocationResults': [{   #TODO Need to iterate all tools
             'functionResult': {
                 'actionGroup': action_group,
                 'function': function,
@@ -126,11 +130,13 @@ def generate_tool_call_session_state(tool_result: Dict[str, Any],
 class BedrockSession:
     """Manages a session with AWS Bedrock agent runtime."""
 
-    def __init__(self, agent_id: str, agent_alias_id: str):
+    def __init__(self, agent_id: str, agent_alias_id: str, catalog_name: str, schema_name: str):
         """Initialize a Bedrock session."""
         self.agent_id = agent_id
         self.agent_alias_id = agent_alias_id
         self.client = boto3.client('bedrock-agent-runtime')
+        self.catalog_name = catalog_name
+        self.schema_name = schema_name
 
     def invoke_agent(
             self,
@@ -138,6 +144,7 @@ class BedrockSession:
             enable_trace: bool = None,
             session_id: str = None,
             session_state: dict = None,
+            streaming_configurations: dict = None,
             uc_client: Optional[UnitycatalogFunctionClient] = None
     ) -> BedrockToolResponse:
         """Invoke the Bedrock agent with the given input text."""
@@ -153,6 +160,8 @@ class BedrockSession:
             params['sessionId'] = session_id
         if session_state is not None:
             params['sessionState'] = session_state
+        if streaming_configurations is not None:
+            params['streamingConfigurations'] = streaming_configurations
 
         response = self.client.invoke_agent(**params)
         tool_calls = extract_tool_calls(response)
@@ -162,11 +171,11 @@ class BedrockSession:
             print(f"Response from invoke agent: {response}") #Debugging
             print(f"Tool Call Results: {tool_calls}") #Debugging
             
-            tool_results = execute_tool_calls(tool_calls, uc_client)
+            tool_results = execute_tool_calls(tool_calls, uc_client, self.catalog_name, self.schema_name)
             print(f"ToolResults: {tool_results}") #Debugging
             if tool_results:
                 session_state = generate_tool_call_session_state(
-                    tool_results[0], tool_calls[0])
+                    tool_results[0], tool_calls[0]) # TODO - Need to pass list of tool results 
                 print(f"SessionState: {session_state}") #Debugging
                 
                 if 'returnControlInvocationResults' in session_state:
@@ -195,7 +204,12 @@ class BedrockSession:
                 return self.invoke_agent(input_text="",
                                        session_id=session_id,
                                        enable_trace=enable_trace,
-                                       session_state=session_state)
+                                       session_state=session_state,
+                                       streaming_configurations={
+                                           'applyGuardrailInterval': 123, # TODO: Test variations
+                                           'streamFinalResponse': True
+                                       }
+                                       )
 
         return BedrockToolResponse(raw_response=response, tool_calls=tool_calls)
 

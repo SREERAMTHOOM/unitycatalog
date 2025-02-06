@@ -1,0 +1,89 @@
+Response from invoke agent: 
+{'ResponseMetadata': {
+    'RequestId': '80be282b-8f01-4a97-9a5c-7efb94f2e2a1', 
+    'HTTPStatusCode': 200, 
+    'HTTPHeaders': {
+        'date': 'Tue, 04 Feb 2025 21:20:29 GMT', 
+        'content-type': 'application/vnd.amazon.eventstream', 
+        'transfer-encoding': 'chunked', 
+        'connection': 'keep-alive', 
+        'x-amzn-requestid': '80be282b-8f01-4a97-9a5c-7efb94f2e2a1', 
+        'x-amz-bedrock-agent-session-id': 'b9666c3a-e33c-11ef-9098-4e3e215d14d1', 
+        'x-amzn-bedrock-agent-content-type': 'application/json'
+        }, 
+    'RetryAttempts': 0
+    }, 
+    'contentType': 'application/json', 
+    'sessionId': 'b9666c3a-e33c-11ef-9098-4e3e215d14d1', 
+    'completion': <botocore.eventstream.EventStream object at 0x115cd5cd0>
+}
+Tool Call Results: [
+    {
+        'function_name': 'tbd-bda-action-group-name__location_weather_in_c', 
+        'parameters': {'fetch_date': '2024-11-19', 'location_id': '1234'}, 
+        'invocation_id': 'c752ccf6-45c6-4ae2-a27a-5dd61378896e-uc-result'
+    }
+]
+Attempting to execute function: tbd-bda-action-group-name__location_weather_in_c with parameters: {'fetch_date': '2024-11-19', 'location_id': '1234'}
+Retrieved function info Override: 
+name='location_weather_in_c' 
+catalog_name='AICatalog' 
+schema_name='AISchema' 
+input_params=FunctionParameterInfos(parameters=[
+    FunctionParameterInfo(name='location_id', type_text='STRING', 
+    type_json='{
+        "name": "location_id", 
+        "type": "string", 
+        "nullable": false, 
+        "metadata": {
+            "comment": "The name to be included in the greeting message."
+            }
+        }', 
+    type_name=<ColumnTypeName.STRING: 'STRING'>, 
+    type_precision=None, 
+    type_scale=None, 
+    type_interval_type=None, 
+    position=0, 
+    parameter_mode=None, 
+    parameter_type=None, 
+    parameter_default=None, 
+    comment='The name to be included in the greeting message.'
+    ), 
+    FunctionParameterInfo(name='fetch_date', type_text='STRING', type_json='{"name": "fetch_date", "type": "string", "nullable": false, "metadata": {"comment": "The date with the location"}}', type_name=<ColumnTypeName.STRING: 'STRING'>, type_precision=None, type_scale=None, type_interval_type=None, position=1, parameter_mode=None, parameter_type=None, parameter_default=None, comment='The date with the location')]) data_type=<ColumnTypeName.STRING: 'STRING'> full_data_type='STRING' return_params=None routine_body='EXTERNAL' routine_definition='try:\n    # Fetch from Databricks SQL Warehouse based UC function execution \n    return "23"\nexcept Exception as e:\n    raise Exception(f"Error occurred: {e}")' routine_dependencies=None parameter_style='S' is_deterministic=True sql_data_access='NO_SQL' is_null_call=False security_type='DEFINER' specific_name='location_weather_in_c' comment='Test function for AWS Bedrock integration.' properties=None full_name='AICatalog.AISchema.location_weather_in_c' owner=None created_at=1738703541746 created_by=None updated_at=1738703541746 updated_by=None function_id='5937d4a7-1d10-4ae2-87ff-1b3be92df25d' external_language='PYTHON'
+ToolResults: [
+    {
+        'invocation_id': 'c752ccf6-45c6-4ae2-a27a-5dd61378896e-uc-result', 
+        'result': '23'
+        }
+    ]
+SessionState: {
+    'invocationId': 'c752ccf6-45c6-4ae2-a27a-5dd61378896e-uc-result', 
+    'returnControlInvocationResults': [
+        {
+            'functionResult': {
+                'actionGroup': 'tbd-bda-action-group-name', 
+                'function': 'location_weather_in_c', 
+                'confirmationState': 'CONFIRM', 
+                'responseBody': {
+                    'TEXT': {'body': '23'}
+                    }
+                }
+        }
+    ]
+}
+Results: [
+    {
+        'functionResult': {
+            'actionGroup': 'tbd-bda-action-group-name', 
+            'function': 'location_weather_in_c', 
+            'confirmationState': 'CONFIRM', 
+            'responseBody': {
+                'TEXT': {
+                    'body': '23'
+                }
+            }
+        }
+    }
+]
+response_body_obj: {'TEXT': {'body': '23'}}
+result value: 23
