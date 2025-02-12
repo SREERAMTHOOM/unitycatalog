@@ -35,11 +35,18 @@ def execute_tool_calls(tool_calls: List[Dict[str, Any]],
             print(f"Full Function Name: {full_function_name}") #Debugging
             function_info = client.get_function(full_function_name)
             print(f"Retrieved function info Override: {function_info}")
-            
+            print("**********************************************************")
+            print(f"too_call {tool_call}")
+            print("**********************************************************")
+
             result = client.execute_function(
                 full_function_name,
                 tool_call['parameters']
             )
+            print("**********************************************************")
+            print(f"too_call {result}")
+            print("**********************************************************")
+
             results.append({
                 'invocation_id': tool_call['invocation_id'],
                 'result': str(result.value)
