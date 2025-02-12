@@ -195,6 +195,121 @@ class BedrockSession:
 
         # TODO: Derive the final response from the LLM response via stream chunks
         return BedrockToolResponse(raw_response=final_response, tool_calls=tool_calls)
+    
+
+    def invoke_agent_tools(
+            self,
+            input_text: str,
+            enable_trace: bool = None,
+            session_id: str = None,
+            uc_client: Optional[UnitycatalogFunctionClient] = None
+    ) -> BedrockToolResponse:
+        """Invoke the Bedrock agent with the given input text."""
+        params = {
+            'agentId': self.agent_id,
+            'agentAliasId': self.agent_alias_id,
+            'inputText': input_text,
+        }
+
+        if enable_trace is not None:
+            params['enableTrace'] = enable_trace
+        if session_id is not None:
+            params['sessionId'] = session_id
+
+        # Invoke the agent for the first time with input prompt/question
+        # The response can be single function call or multiple functions
+        # As of now we are seeing single function at a time 
+        response = self.client.invoke_agent(**params)
+
+        # Need to do recursive calls to process
+        tool_calls = extract_tool_calls(response)
+        if tool_calls:
+            # Process tool calls here
+            function_name_to_execute = (tool_calls[0]['function_name']).split('__')[1]
+            # Executing the UC functions in the current python environment
+            tool_results = execute_tool_calls(tool_calls, uc_client,
+                                            catalog_name=self.catalog_name,
+                                            schema_name=self.schema_name,
+                                            function_name=function_name_to_execute)
+            
+            if tool_results:
+                # Generate the session state for the next invocation with results.
+                session_state = generate_tool_call_session_state(tool_results[0], tool_calls[0])
+                # Calling the agent for the second time after gathering the tool results.
+                time.sleep(65) #TODO: Remove this sleep
+                params['sessionState'] = session_state
+                intermediate_response = self.client.invoke_agent(**params)
+                intermediate_tool_calls = extract_tool_calls(intermediate_response)
+                # if intermediate_tool_calls:
+                #     continue
+           
+        
+        # There is a returnControl with single input function
+
+        if uc_client:
+            # There is a response with UC functions to call.
+            print(f"Response from invoke agent: {response}") #Debugging
+            print(f"Tool Call Results: {tool_calls}") #Debugging
+            
+            print("****************************")
+            print(f"Tool Calls: {tool_calls[0]['function_name']}") #Debugging
+            function_name_to_execute = (tool_calls[0]['function_name']).split('__')[1]
+            print("****************************")
+            # Executing the UC functions in the current python environment
+            tool_results = execute_tool_calls(tool_calls, uc_client,
+                                              catalog_name=self.catalog_name,
+                                              schema_name=self.schema_name,
+                                              function_name=function_name_to_execute)
+            print(f"ToolResults: {tool_results}") #Debugging
+            
+            if tool_results:
+                # Generate the session state for the next invocation with results.
+                session_state = generate_tool_call_session_state(
+                    tool_results[0], tool_calls[0])
+                print(f"SessionState from tool_results: {session_state}") #Debugging
+                
+                # Below is only for debugging. No need to capture the result value.
+                if 'returnControlInvocationResults' in session_state:
+                    # Final result obtained; return without re-invoking the agent.
+                    results = session_state.get('returnControlInvocationResults', [])
+                    
+                    print(f"Results: {results}") # Debugging
+                    if results:
+                        response_body_obj = results[0].get('functionResult', {}).get('responseBody', {})
+                        print(f"response_body_obj: {response_body_obj}") # Debugging
+                        # Dynamically extract the first key-value pair from the response body
+                        if response_body_obj:
+                            dynamic_key = next(iter(response_body_obj))
+                            result_value = response_body_obj.get(dynamic_key, {}).get('body')
+                            print(f"result value: {result_value}") # Debugging
+                        else:
+                            result_value = None
+                    else:
+                        result_value = None
+                # End of Debugging block.
+
+
+
+                    # return BedrockToolResponse(
+                    #     raw_response=response,
+                    #     tool_calls=tool_calls,
+                    #     response_body=result_value  # returns the dynamically extracted value, e.g. '23'
+                    # )
+            
+            
+            
+            
+            # Calling the agent for the second time after gathering the tool results.
+            time.sleep(65) #TODO: Remove this sleep
+            params['sessionState'] = session_state
+            params['streamingConfigurations'] = {
+                                       'applyGuardrailInterval': 123, # TODO: Test variations
+                                       'streamFinalResponse': True
+                                   }
+            final_response = self.client.invoke_agent(**params)
+
+        # TODO: Derive the final response from the LLM response via stream chunks
+        return BedrockToolResponse(raw_response=final_response, tool_calls=tool_calls)
 
 class BedrockTool(BaseModel):
     """Model representing a Unity Catalog function as a Bedrock tool."""

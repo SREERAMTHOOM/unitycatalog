@@ -59,6 +59,7 @@ def execute_tool_calls(tool_calls: List[Dict[str, Any]],
             })
     return results
 
+# TODO: Iterate over tool calls and update session state
 def generate_tool_call_session_state(tool_result: Dict[str, Any], 
                                    tool_call: Dict[str, Any]) -> Dict[str, Any]:
     """Generate session state for tool call results."""
