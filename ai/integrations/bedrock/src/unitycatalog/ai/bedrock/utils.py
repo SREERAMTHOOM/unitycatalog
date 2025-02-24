@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 import time
 
 def extract_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Extracts tool calls from Bedrock response."""
+    """Extracts tool calls from Bedrock response with support for multiple functions."""
     tool_calls = []
     for event in response.get('completion', []):
         if 'returnControl' in event:
@@ -11,9 +11,12 @@ def extract_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
             for invocation in control_data.get('invocationInputs', []):
                 if 'functionInvocationInput' in invocation:
                     func_input = invocation['functionInvocationInput']
-                    func_name = f"{func_input['actionGroup']}__{func_input['function']}"
+                    action_group = func_input['actionGroup']
+                    function = func_input['function']
                     tool_calls.append({
-                        'function_name': func_name,
+                        'action_group': action_group,
+                        'function': function,
+                        'function_name': f"{action_group}__{function}",
                         'parameters': {
                             p['name']: p['value']
                             for p in func_input['parameters']
@@ -32,27 +35,20 @@ def execute_tool_calls(tool_calls: List[Dict[str, Any]],
     for tool_call in tool_calls:
         try:
             full_function_name = f"{catalog_name}.{schema_name}.{function_name}"
-            print(f"Full Function Name: {full_function_name}") #Debugging
+            print(f"Full Function Name: {full_function_name}") 
             function_info = client.get_function(full_function_name)
-            print(f"Retrieved function info Override: {function_info}")
-            print("**********************************************************")
-            print(f"too_call {tool_call}")
-            print("**********************************************************")
-
+            print(f"Retrieved function info: {function_info}")
+            
             result = client.execute_function(
                 full_function_name,
                 tool_call['parameters']
             )
-            print("**********************************************************")
-            print(f"too_call {result}")
-            print("**********************************************************")
-
             results.append({
                 'invocation_id': tool_call['invocation_id'],
                 'result': str(result.value)
             })
         except Exception as e:
-            print(f"Error executing tool call for {tool_call}: {e}") #Debugging
+            print(f"Error executing tool call: {e}")
             results.append({
                 'invocation_id': tool_call['invocation_id'],
                 'error': str(e)
@@ -62,13 +58,12 @@ def execute_tool_calls(tool_calls: List[Dict[str, Any]],
 def generate_tool_call_session_state(tool_result: Dict[str, Any], 
                                    tool_call: Dict[str, Any]) -> Dict[str, Any]:
     """Generate session state for tool call results."""
-    action_group, function = tool_call['function_name'].split('__')
     return {
         'invocationId': tool_result['invocation_id'],
         'returnControlInvocationResults': [{
             'functionResult': {
-                'actionGroup': action_group,
-                'function': function,
+                'actionGroup': tool_call['action_group'],
+                'function': tool_call['function'],
                 'confirmationState': 'CONFIRM',
                 'responseBody': {
                     'TEXT': {
