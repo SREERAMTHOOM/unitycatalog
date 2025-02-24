@@ -118,12 +118,9 @@ class BedrockSession:
         if session_state is not None:
             params['sessionState'] = session_state
         # if streaming_configurations is not None:
-        #     print("*********************")
-        #     print(streaming_configurations)
-        #     print("*********************")
         #     params['streamingConfigurations'] = streaming_configurations
 
-         # Invoke the agent for the first time
+         # Invoke the agent
         response = self.client.invoke_agent(**params)
         tool_calls = extract_tool_calls(response)
 
