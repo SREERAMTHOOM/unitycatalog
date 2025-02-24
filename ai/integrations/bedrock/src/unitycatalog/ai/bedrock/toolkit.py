@@ -115,8 +115,8 @@ class BedrockSession:
             params['enableTrace'] = enable_trace
         if session_id is not None:
             params['sessionId'] = session_id
-        # if session_state is not None:
-        #     params['sessionState'] = session_state
+        if session_state is not None:
+            params['sessionState'] = session_state
         # if streaming_configurations is not None:
         #     print("*********************")
         #     print(streaming_configurations)
@@ -124,11 +124,8 @@ class BedrockSession:
         #     params['streamingConfigurations'] = streaming_configurations
 
          # Invoke the agent for the first time
-
         response = self.client.invoke_agent(**params)
         tool_calls = extract_tool_calls(response)
-        
-        # Testing for single tool/function 
 
         if tool_calls and uc_client:
             # There is a response with UC functions to call.
@@ -137,9 +134,12 @@ class BedrockSession:
             
             print("****************************")
             print(f"Tool Calls: {tool_calls[0]['function_name']}") #Debugging
+            
             function_name_to_execute = (tool_calls[0]['function_name']).split('__')[1]
+            
             #print(f"Parameter: {self.function_name}") #Debugging
             print("****************************")
+            
             # Executing the UC functions in the current python environment
             tool_results = execute_tool_calls(tool_calls, uc_client,
                                               catalog_name=self.catalog_name,
@@ -153,47 +153,21 @@ class BedrockSession:
                     tool_results[0], tool_calls[0])
                 print(f"SessionState from tool_results: {session_state}") #Debugging
                 
-                # Below is only for debugging. No need to capture the result value.
-                if 'returnControlInvocationResults' in session_state:
-                    # Final result obtained; return without re-invoking the agent.
-                    results = session_state.get('returnControlInvocationResults', [])
-                    
-                    print(f"Results: {results}") # Debugging
-                    if results:
-                        response_body_obj = results[0].get('functionResult', {}).get('responseBody', {})
-                        print(f"response_body_obj: {response_body_obj}") # Debugging
-                        # Dynamically extract the first key-value pair from the response body
-                        if response_body_obj:
-                            dynamic_key = next(iter(response_body_obj))
-                            result_value = response_body_obj.get(dynamic_key, {}).get('body')
-                            print(f"result value: {result_value}") # Debugging
-                        else:
-                            result_value = None
-                    else:
-                        result_value = None
-                # End of Debugging block.
-
-
-
-                    # return BedrockToolResponse(
-                    #     raw_response=response,
-                    #     tool_calls=tool_calls,
-                    #     response_body=result_value  # returns the dynamically extracted value, e.g. '23'
-                    # )
             
-            
-            
-            
-            # Calling the agent for the second time after gathering the tool results.
-            time.sleep(65) #TODO: Remove this sleep
-            params['sessionState'] = session_state
-            params['streamingConfigurations'] = {
-                                       'applyGuardrailInterval': 123, # TODO: Test variations
-                                       'streamFinalResponse': True
-                                   }
-            final_response = self.client.invoke_agent(**params)
+                # Calling the agent for the second time after gathering the tool results.
+                time.sleep(65) #TODO: Remove this sleep and make this exponential
 
-        # TODO: Derive the final response from the LLM response via stream chunks
+                # TODO: Handle below when we are invoking the final response.
+                # params['streamingConfigurations'] = {
+                #                        'applyGuardrailInterval': 123, # TODO: Test variations
+                #                        'streamFinalResponse': True
+                #                    }
+                
+                return self.invoke_agent(input_text="",
+                                      session_id=session_id,
+                                      enable_trace=enable_trace,
+                                      session_state=session_state)
+
         return BedrockToolResponse(raw_response=final_response, tool_calls=tool_calls)
 
 class BedrockTool(BaseModel):
