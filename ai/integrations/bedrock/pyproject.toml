@@ -72,3 +72,14 @@ docstring-code-line-length = 88
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.pytest.ini_options]
+
+testpaths = [
+    "tests",
+]
+
+markers = [
+    "bedrock: Bedrock response parsing",
+    "toolkit: Toolkit response parsing",
+]
