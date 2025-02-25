@@ -2,6 +2,41 @@
 from typing import Dict, Any, List
 import time
 
+def extract_response_details(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Extracts returnControl or chunks from Bedrock response"""
+    tool_calls = []
+    response_details = {}
+
+    for event in response.get('completion', []):
+        print("*****event*******")
+        print(event)
+        print("*****event*******")
+        # TODO: Revist to process the event stream 
+        if 'chunk' in event:
+                chunk = event['chunk'].get('bytes', b'').decode('utf-8')
+                if chunk:
+                    response_details["chunks"]=chunk
+
+        if 'returnControl' in event:
+            control_data = event['returnControl']
+            for invocation in control_data.get('invocationInputs', []):
+                if 'functionInvocationInput' in invocation:
+                    func_input = invocation['functionInvocationInput']
+                    action_group = func_input['actionGroup']
+                    function = func_input['function']
+                    tool_calls.append({
+                        'action_group': action_group,
+                        'function': function,
+                        'function_name': f"{action_group}__{function}",
+                        'parameters': {
+                            p['name']: p['value']
+                            for p in func_input['parameters']
+                        },
+                        'invocation_id': control_data['invocationId']
+                    })
+            response_details["tool_calls"] = tool_calls
+    return response_details
+
 def extract_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Extracts tool calls from Bedrock response with support for multiple functions."""
     tool_calls = []
