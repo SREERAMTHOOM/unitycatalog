@@ -5,7 +5,10 @@ import time
 def extract_response_details(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Extracts returnControl or chunks from Bedrock response"""
     tool_calls = []
-    response_details = {}
+    response_details = {
+        "chunks": "",
+        "tool_calls": []
+    }
 
     for event in response.get('completion', []):
         print("*****event*******")
@@ -15,7 +18,7 @@ def extract_response_details(response: Dict[str, Any]) -> List[Dict[str, Any]]:
         if 'chunk' in event:
                 chunk = event['chunk'].get('bytes', b'').decode('utf-8')
                 if chunk:
-                    response_details["chunks"]=chunk
+                    response_details["chunks"] += chunk
 
         if 'returnControl' in event:
             control_data = event['returnControl']

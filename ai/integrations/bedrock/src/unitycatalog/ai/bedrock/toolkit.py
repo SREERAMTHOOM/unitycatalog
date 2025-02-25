@@ -101,7 +101,7 @@ class BedrockSession:
             enable_trace: bool = None,
             session_id: str = None,
             session_state: dict = None,
-            #streaming_configurations: dict = None,
+            streaming_configurations: dict = None,
             uc_client: Optional[UnitycatalogFunctionClient] = None
     ) -> BedrockToolResponse:
         """Invoke the Bedrock agent with the given input text."""
@@ -117,8 +117,8 @@ class BedrockSession:
             params['sessionId'] = session_id
         if session_state is not None:
             params['sessionState'] = session_state
-        # if streaming_configurations is not None:
-        #     params['streamingConfigurations'] = streaming_configurations
+        if streaming_configurations is not None:
+            params['streamingConfigurations'] = streaming_configurations
 
          # Invoke the agent
         print("****************************")
@@ -133,10 +133,10 @@ class BedrockSession:
 
         tool_calls = []
         final_response_body = None
-        if 'chunks' in extracted_details:
+        if 'chunks' in extracted_details and extracted_details["chunks"]:
             final_response_body = extracted_details['chunks']
                
-        elif 'tool_calls' in extracted_details:
+        elif 'tool_calls' in extracted_details and extracted_details['tool_calls']:
             tool_calls = extracted_details['tool_calls']
 
             #tool_calls = extract_tool_calls(response)
@@ -169,7 +169,7 @@ class BedrockSession:
                     time.sleep(65) #TODO: Remove this sleep and make this exponential
 
                     # TODO: Handle below when we are invoking the final response.
-                    # params['streamingConfigurations'] = {
+                    #  {
                     #                        'applyGuardrailInterval': 123, # TODO: Test variations
                     #                        'streamFinalResponse': True
                     #                    }
@@ -178,6 +178,10 @@ class BedrockSession:
                                         session_id=session_id,
                                         enable_trace=enable_trace,
                                         session_state=session_state,
+                                        streaming_configurations={
+                                            'applyGuardrailInterval': 123,
+                                            'streamFinalResponse': True
+                                        },
                                         uc_client=uc_client)
         
         return BedrockToolResponse(raw_response=response, tool_calls=tool_calls, response_body=final_response_body)
