@@ -1,66 +1,56 @@
-
 from typing import Dict, Any, List
-import time
+import logging
 
-def extract_response_details(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+logger = logging.getLogger(__name__)
+
+def extract_response_details(response: Dict[str, Any]) -> Dict[str, Any]:
     """Extracts returnControl or chunks from Bedrock response"""
-    tool_calls = []
     response_details = {
         "chunks": "",
         "tool_calls": []
     }
 
     for event in response.get('completion', []):
-        print("*****event*******")
-        print(event)
-        print("*****event*******")
-        # TODO: Revist to process the event stream 
-        if 'chunk' in event:
+        try:
+            # TODO: Revist to process the event stream 
+            if 'chunk' in event:
                 chunk = event['chunk'].get('bytes', b'').decode('utf-8')
                 if chunk:
                     response_details["chunks"] += chunk
 
-        if 'returnControl' in event:
-            control_data = event['returnControl']
-            for invocation in control_data.get('invocationInputs', []):
-                if 'functionInvocationInput' in invocation:
-                    func_input = invocation['functionInvocationInput']
-                    action_group = func_input['actionGroup']
-                    function = func_input['function']
-                    tool_calls.append({
-                        'action_group': action_group,
-                        'function': function,
-                        'function_name': f"{action_group}__{function}",
-                        'parameters': {
-                            p['name']: p['value']
-                            for p in func_input['parameters']
-                        },
-                        'invocation_id': control_data['invocationId']
-                    })
-            response_details["tool_calls"] = tool_calls
+            if 'returnControl' in event:
+                response_details["tool_calls"].extend(extract_tool_calls_from_event(event))
+        except Exception as e:
+            logger.error(f"Error processing event: {e}")
     return response_details
+
+def extract_tool_calls_from_event(event: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Extracts tool calls from a single event."""
+    tool_calls = []
+    if 'returnControl' in event:
+        control_data = event['returnControl']
+        for invocation in control_data.get('invocationInputs', []):
+            if 'functionInvocationInput' in invocation:
+                func_input = invocation['functionInvocationInput']
+                action_group = func_input['actionGroup']
+                function = func_input['function']
+                tool_calls.append({
+                    'action_group': action_group,
+                    'function': function,
+                    'function_name': f"{action_group}__{function}",
+                    'parameters': {
+                        p['name']: p['value']
+                        for p in func_input['parameters']
+                    },
+                    'invocation_id': control_data['invocationId']
+                })
+    return tool_calls
 
 def extract_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Extracts tool calls from Bedrock response with support for multiple functions."""
     tool_calls = []
     for event in response.get('completion', []):
-        if 'returnControl' in event:
-            control_data = event['returnControl']
-            for invocation in control_data.get('invocationInputs', []):
-                if 'functionInvocationInput' in invocation:
-                    func_input = invocation['functionInvocationInput']
-                    action_group = func_input['actionGroup']
-                    function = func_input['function']
-                    tool_calls.append({
-                        'action_group': action_group,
-                        'function': function,
-                        'function_name': f"{action_group}__{function}",
-                        'parameters': {
-                            p['name']: p['value']
-                            for p in func_input['parameters']
-                        },
-                        'invocation_id': control_data['invocationId']
-                    })
+        tool_calls.extend(extract_tool_calls_from_event(event))
     return tool_calls
 
 def execute_tool_calls(tool_calls: List[Dict[str, Any]], 
@@ -73,9 +63,9 @@ def execute_tool_calls(tool_calls: List[Dict[str, Any]],
     for tool_call in tool_calls:
         try:
             full_function_name = f"{catalog_name}.{schema_name}.{function_name}"
-            print(f"Full Function Name: {full_function_name}") 
+            logger.info(f"Full Function Name: {full_function_name}") 
             function_info = client.get_function(full_function_name)
-            print(f"Retrieved function info: {function_info}")
+            logger.info(f"Retrieved function info: {function_info}")
             
             result = client.execute_function(
                 full_function_name,
@@ -86,7 +76,7 @@ def execute_tool_calls(tool_calls: List[Dict[str, Any]],
                 'result': str(result.value)
             })
         except Exception as e:
-            print(f"Error executing tool call: {e}")
+            logger.error(f"Error executing tool call: {e}")
             results.append({
                 'invocation_id': tool_call['invocation_id'],
                 'error': str(e)
