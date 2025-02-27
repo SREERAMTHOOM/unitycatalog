@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Union, Iterator
 from pprint import pprint
 import boto3
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+import logging
 
 from .utils import extract_tool_calls, extract_response_details, execute_tool_calls, generate_tool_call_session_state
 
@@ -17,6 +18,8 @@ import time
 
 # Setup AWS credentials if available
 boto3.setup_default_session()
+
+logger = logging.getLogger(__name__)
 
 class BedrockToolResponse(BaseModel):
     """Class to handle Bedrock agent responses and tool calls."""
@@ -87,7 +90,7 @@ class BedrockSession:
         self.schema_name = schema_name
         #self.function_name = function_name
         
-        print(
+        logger.info(
             f"Initialized BedrockSession with agent_id: {self.agent_id}, "
             f"agent_alias_id: {self.agent_alias_id}, "
             f"catalog_name: {self.catalog_name}",
@@ -121,13 +124,13 @@ class BedrockSession:
             params['streamingConfigurations'] = streaming_configurations
 
          # Invoke the agent
-        print("****************************")
-        print("Invoking the agent with params:")
-        print(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}")
-        print(params)  # Debugging  
-        print("****************************")
+        logger.info("****************************")
+        logger.info("Invoking the agent with params:")
+        logger.info(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}")
+        logger.info(params)  # Debugging  
+        logger.info("****************************")
         response = self.client.invoke_agent(**params)
-        print(f"Response from invoke agent: {response}") #Debugging
+        logger.info(f"Response from invoke agent: {response}") #Debugging
 
         extracted_details = extract_response_details(response)
 
@@ -140,31 +143,31 @@ class BedrockSession:
             tool_calls = extracted_details['tool_calls']
 
             #tool_calls = extract_tool_calls(response)
-            print(f"Tool Call Results: {tool_calls}") #Debugging
+            logger.info(f"Tool Call Results: {tool_calls}") #Debugging
             if tool_calls and uc_client:
                 # There is a response with UC functions to call.
-                print("****************************")
-                print(f"Tool Calls: {tool_calls[0]['function_name']}") #Debugging
+                logger.info("****************************")
+                logger.info(f"Tool Calls: {tool_calls[0]['function_name']}") #Debugging
                 
                 function_name_to_execute = (tool_calls[0]['function_name']).split('__')[1]
                 
-                #print(f"Parameter: {self.function_name}") #Debugging
-                print("****************************")
+                #logger.info(f"Parameter: {self.function_name}") #Debugging
+                logger.info("****************************")
                 
                 # Executing the UC functions in the current python environment
                 tool_results = execute_tool_calls(tool_calls, uc_client,
                                                 catalog_name=self.catalog_name,
                                                 schema_name=self.schema_name,
                                                 function_name=function_name_to_execute)
-                print(f"ToolResults: {tool_results}") #Debugging
+                logger.info(f"ToolResults: {tool_results}") #Debugging
                 
                 if tool_results:
                     # Generate the session state for the next invocation with results.
                     session_state = generate_tool_call_session_state(
                         tool_results[0], tool_calls[0])
-                    print(f"SessionState from tool_results: {session_state}") #Debugging
+                    logger.info(f"SessionState from tool_results: {session_state}") #Debugging
                     
-                    print("Sleeping for 65 seconds before invoking the agent again...")
+                    logger.info("Sleeping for 65 seconds before invoking the agent again...")
                     # Calling the agent with session state
                     time.sleep(65) #TODO: Remove this sleep and make this exponential
 
@@ -173,7 +176,7 @@ class BedrockSession:
                     #                        'applyGuardrailInterval': 123, # TODO: Test variations
                     #                        'streamFinalResponse': True
                     #                    }
-                print(f"SessionState before invoking agent again: {session_state}")  # Debugging
+                logger.info(f"SessionState before invoking agent again: {session_state}")  # Debugging
                 return self.invoke_agent(input_text="",
                                         session_id=session_id,
                                         enable_trace=enable_trace,
@@ -253,13 +256,16 @@ class UCFunctionToolkit(BaseModel):
             )
 
         client = validate_or_set_default_client(client)
-        if function_name:
-            function_info = client.get_function(function_name)
-        elif function_info:
-            function_name = function_info.full_name
-        else:
-            raise ValueError(
-                "Either function_name or function_info should be provided.")
+        try:
+            if function_name:
+                function_info = client.get_function(function_name)
+            elif function_info:
+                function_name = function_info.full_name
+            else:
+                raise ValueError(
+                    "Either function_name or function_info should be provided.")
+        except Exception as e:
+            raise ValueError(f"Failed to retrieve function info: {e}")
 
         fn_schema = generate_function_input_params_schema(function_info)
         parameters = {
